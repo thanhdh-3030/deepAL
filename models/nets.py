@@ -20,7 +20,7 @@ class Net:
         n_epoch = self.params['n_epoch']
 
         dim = data.X.shape[1:]
-        self.clf = self.net(dim = dim, pretrained = self.params['pretrained'], num_classes = self.params['num_class']).to(self.device)
+        self.clf = self.net.to(self.device)
         self.clf.train()
         if self.params['optimizer'] == 'Adam':
             optimizer = optim.Adam(self.clf.parameters(), **self.params['optimizer_args'])
@@ -34,7 +34,7 @@ class Net:
             for batch_idx, (x, y, idxs) in enumerate(loader):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
-                out, e1 = self.clf(x)
+                out,x= self.clf(x)
                 loss = F.cross_entropy(out, y)
                 loss.backward()
                 optimizer.step()
@@ -149,7 +149,7 @@ class MNIST_Net(nn.Module):
 		return self.dim
 
 class CIFAR10_Net(nn.Module):
-	def __init__(self, dim = 28 * 28, pretrained=False, num_classes = 10):
+	def __init__(self, dim = 28 * 28, pretrained=True, num_classes = 10):
 		super().__init__()
 		resnet18 = models.resnet18(pretrained=pretrained)
 		features_tmp = nn.Sequential(*list(resnet18.children())[:-1])

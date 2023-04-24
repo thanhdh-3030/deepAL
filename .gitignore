@@ -1,0 +1,6 @@
+logfile/
+data/
+results/
+modelpara/
+*.pyc
+*.pth

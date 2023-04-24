@@ -3,7 +3,6 @@ import argparse
 import sys
 import os
 import re
-
 import yaml
 from ast import literal_eval
 import copy
