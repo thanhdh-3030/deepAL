@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import warnings
 import torch
-from utils import get_dataset, get_net, get_net_lpl, get_net_waal, get_strategy
+from utils import get_dataset, get_net, get_net_lpl, get_net_waal, get_strategy,get_contrast_net
 from pprint import pprint
 
 torch.set_printoptions(profile='full')
@@ -42,7 +42,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 #recording
-sys.stdout = Logger(os.path.abspath('') + '/logfile/' + DATA_NAME+ '_'  + STRATEGY_NAME + '_' + str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_log.txt')
+sys.stdout = Logger(os.path.abspath('') + '/logfile/' + DATA_NAME+ '_'  + STRATEGY_NAME + '_' +'contrastive_'+str(args_input.use_contrast)+'_'+str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_log.txt')
 warnings.filterwarnings('ignore')
 
 # start experiment
@@ -59,12 +59,16 @@ while (iteration > 0):
 	# data, network, strategy
 	args_task = args_pool[DATA_NAME]
 	dataset = get_dataset(args_input.dataset_name, args_task)				# load dataset
-	if args_input.ALstrategy == 'LossPredictionLoss':
-		net = get_net_lpl(args_input.dataset_name, args_task, device)		# load network
-	elif args_input.ALstrategy == 'WAAL':
-		net = get_net_waal(args_input.dataset_name, args_task, device)		# load network
-	else:
-		net = get_net(args_input.dataset_name, args_task, device)			# load network
+	if args_input.use_contrast:
+		net=get_contrast_net(args_input.dataset_name, args_task, device)	# load contrastive net
+	else: 
+		if args_input.ALstrategy == 'LossPredictionLoss':
+			net = get_net_lpl(args_input.dataset_name, args_task, device)		# load network
+		elif args_input.ALstrategy == 'WAAL':
+			net = get_net_waal(args_input.dataset_name, args_task, device)		# load network
+		else:
+			net = get_net(args_input.dataset_name, args_task, device)			# load network
+	
 	strategy = get_strategy(args_input.ALstrategy, dataset, net, args_input, args_task)  # load strategy
 
 	start = datetime.datetime.now()
@@ -140,7 +144,7 @@ while (iteration > 0):
 	
 # cal mean & standard deviation
 acc_m = []
-file_name_res_tot = DATA_NAME+ '_'  + STRATEGY_NAME + '_' + str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_res_tot.txt'
+file_name_res_tot = DATA_NAME+ '_'  + STRATEGY_NAME + '_' +'contrastive_'+str(args_input.use_contrast)+'_'+ str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_res_tot.txt'
 file_res_tot =  open(os.path.join(os.path.abspath('') + '/results', '%s' % file_name_res_tot),'w')
 
 file_res_tot.writelines('dataset: {}'.format(DATA_NAME) + '\n')

@@ -6,6 +6,7 @@ from models.nets import Net, MNIST_Net, CIFAR10_Net, openml_Net, PneumoniaMNIST_
 from models.nets_lossprediction import Net_LPL, MNIST_Net_LPL, CIFAR10_Net_LPL, PneumoniaMNIST_Net_LPL, waterbirds_Net_LPL, get_lossnet
 from models.nets_waal import Net_WAAL, MNIST_Net_WAAL, CIFAR10_Net_WAAL, waterbirds_Net_WAAL, CLF_WAAL, Discriminator
 from models.resnet import ResNet18
+from models.nets_contrast import ContrastNet
 from query_strategies import RandomSampling, LeastConfidence, MarginSampling, EntropySampling, \
 								LeastConfidenceDropout, MarginSamplingDropout, EntropySamplingDropout, \
 								KMeansSampling, KMeansSamplingGPU, KCenterGreedy, KCenterGreedyPCA, BALDDropout,  \
@@ -152,7 +153,10 @@ def get_net(name, args_task, device):
 		return Net(waterbirds_Net, args_task, device)
 	else:
 		raise NotImplementedError
-
+# contrastive net
+def get_contrast_net(name, args_task, device):
+	if name=='CIFAR10':
+		return ContrastNet(ResNet18(),args_task,device)
 def get_net_lpl(name, args_task, device):
 	loss_net = get_lossnet(args_task['name'])
 	if name == 'MNIST':

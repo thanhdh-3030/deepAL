@@ -42,8 +42,9 @@ class CIFAR10_Handler(Dataset):
     def __getitem__(self, index):
         x, y = self.X[index], self.Y[index]
         x = Image.fromarray(x)
-        x = self.transform(x)
-        return x, y, index
+        x1 = self.transform(x)
+        x2=self.transform(x)
+        return x1,x2, y, index
 
     def __len__(self):
         return len(self.X)

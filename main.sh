@@ -1,5 +1,5 @@
 python main.py \
-    -a BALDDropout \
+    -a EntropySamplingDropout \
     -s 5000 \
     -q 15000 \
     -b 2500 \
