@@ -9,7 +9,7 @@ from torch.autograd import Variable
 from copy import deepcopy
 from tqdm import tqdm
 import torch.nn.init as init
-
+from models.nt_xent_loss import NTXentLoss
 class ContrastNet:
     def __init__(self, net, params, device,):
         self.net = net
@@ -41,7 +41,9 @@ class ContrastNet:
                 e1=F.normalize(e1,dim=1)
                 e2=F.normalize(e2,dim=1)
                 e2=e2.detach()
-                contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
+                # contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
+                contrast_criterion=NTXentLoss(device=self.device,batch_size=x1.shape[0],temperature=0.1,use_cosine_similarity=False)
+                contrast_loss=contrast_criterion(e1,e2)
                 ce_loss = F.cross_entropy(out, y)
                 total_loss=self.params['contrast_weight']*contrast_loss+ce_loss
                 total_loss.backward()
