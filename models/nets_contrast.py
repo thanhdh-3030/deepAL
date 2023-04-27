@@ -15,7 +15,7 @@ class ContrastNet:
         self.net = net
         self.params = params
         self.device = device
-        self.queue=torch.randn(self.params['embedding_dim'],self.params['memory_size'],self.params['embedding_dim']) # (K,D)
+        self.queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
         self.queue=F.normalize(self.queue,p=2,dim=0)
         self.queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
     def train(self, data):
@@ -48,6 +48,11 @@ class ContrastNet:
                 total_loss=self.params['contrast_weight']*contrast_loss+ce_loss
                 total_loss.backward()
                 optimizer.step()
+
+                # update memory bank
+                # update when queue size is divisible by batch size
+                if self.params%e1.shape[0]==0: 
+                    self._dequeue_and_enqueue(e1)
         for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (x,_, y, idxs) in enumerate(loader):
                 x, y = x.to(self.device), y.to(self.device)
