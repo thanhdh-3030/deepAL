@@ -72,7 +72,7 @@ args_pool = {'MNIST':
 				 'loader_te_args':{'batch_size': 1000, 'num_workers': 4},
 				 'num_class':10,
                  'memory_size':256,
-                 'embedding_dim':256,
+                 'embedding_dim':512,
                  'temperature':0.2,
                  'contrast_weight':0.1,
 				 'pretrained': True,
