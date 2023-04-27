@@ -73,7 +73,7 @@ args_pool = {'MNIST':
 				 'num_class':10,
                  'memory_size':256,
                  'embedding_dim':512,
-                 'temperature':0.07,
+                 'temperature':0.1,
                  'contrast_weight':0.1,
 				 'pretrained': True,
 				 'optimizer':'Adam',
