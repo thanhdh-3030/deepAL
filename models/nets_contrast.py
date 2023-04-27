@@ -16,7 +16,7 @@ class ContrastNet:
         self.params = params
         self.device = device
         self.queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
-        self.queue=F.normalize(self.queue,p=2,dim=0)
+        self.queue=F.normalize(self.queue,dim=0)
         self.queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
     def train(self, data):
         n_epoch = self.params['n_epoch']
@@ -35,15 +35,16 @@ class ContrastNet:
             for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
-                out, e1 = self.clf(x1)
-                _, e2 = self.clf(x2)
-                # normalize embedding 
-                e1=F.normalize(e1,dim=1)
-                e2=F.normalize(e2,dim=1)
-                e2=e2.detach()
-                contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
+                out, query = self.clf(x1)
+                with torch.no_grad():  # no gradient to keys
+                    _, key = self.clf(x2)
+                key=key.detach()
+                # normalize embedding
+                query=F.normalize(query,dim=1)
+                key=F.normalize(key,dim=1)
+                contrast_loss=self._compute_unlabel_contrastive_loss(query,key)
                 # contrast_criterion=NTXentLoss(device=self.device,batch_size=x1.shape[0],temperature=0.1,use_cosine_similarity=False)
-                # contrast_loss=contrast_criterion(e1,e2)
+                # contrast_loss=contrast_criterion(query,key)
                 ce_loss = F.cross_entropy(out, y)
                 total_loss=self.params['contrast_weight']*contrast_loss+ce_loss
                 total_loss.backward()
@@ -51,8 +52,8 @@ class ContrastNet:
 
                 # update memory bank
                 # update when queue size is divisible by batch size
-                if self.params%e1.shape[0]==0: 
-                    self._dequeue_and_enqueue(e1)
+                if (int(self.queue_ptr)+key.shape[0])%self.params['memory_size']==0: 
+                    self._dequeue_and_enqueue(key)
         for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (x,_, y, idxs) in enumerate(loader):
                 x, y = x.to(self.device), y.to(self.device)
@@ -78,10 +79,10 @@ class ContrastNet:
         # gather keys before updating queue
         batch_size = keys.shape[0]
         ptr = int(self.queue_ptr)
-        assert self.K % batch_size == 0  # for simplicity
+        assert self.params['memory_size'] % batch_size == 0  # for simplicity
         # replace the keys at ptr (dequeue and enqueue)
         self.queue[:, ptr : ptr + batch_size] = keys.T
-        ptr = (ptr + batch_size) % self.K  # move pointer
+        ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
         self.queue_ptr[0] = ptr
     # def _compute_positive_contrastive_loss(self,keys,appeared_categories):
     #     """ Calculate contrastive loss enfoces the embeddings of same class
@@ -96,7 +97,7 @@ class ContrastNet:
     #         negative_keys=self.queue[neg_ids] # 
     #     return 
     def _compute_unlabel_contrastive_loss(self,query,positive_key):
-        """ Calculates the contrastive loss for self-supervised learning.
+        """ Calculates the unlabel contrastive loss for self-supervised learning.
         Args:
             query (torch.Tensor): Tensor with query samples (e.g. embeddings of the input).
                 (N,D) where D is embedding dim.

@@ -6,4 +6,4 @@ python main.py \
     -d CIFAR10 \
     --seed 4666 \
     -t 6 \
-    -g 0
+    -g 1
