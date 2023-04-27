@@ -31,7 +31,7 @@ class ContrastNet:
             raise NotImplementedError
 
         loader = DataLoader(data, shuffle=True, **self.params['loader_tr_args'])
-        for epoch in tqdm(range(1, n_epoch+1), ncols=100):
+        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
@@ -40,18 +40,26 @@ class ContrastNet:
                 # normalize embedding 
                 e1=F.normalize(e1,dim=1)
                 e2=F.normalize(e2,dim=1)
+                e2=e2.detach()
                 contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
                 ce_loss = F.cross_entropy(out, y)
-                total_loss=contrast_loss+ce_loss
+                total_loss=self.params['contrast_weight']*contrast_loss+ce_loss
                 total_loss.backward()
                 optimizer.step()
-
+        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
+            for batch_idx, (x,_, y, idxs) in enumerate(loader):
+                x, y = x.to(self.device), y.to(self.device)
+                optimizer.zero_grad()
+                out, e1 = self.clf(x)
+                ce_loss = F.cross_entropy(out, y)
+                ce_loss.backward()
+                optimizer.step()
     def predict(self, data):
         self.clf.eval()
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 pred = out.max(1)[1]
@@ -100,7 +108,7 @@ class ContrastNet:
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 prob = F.softmax(out, dim=1)
@@ -118,7 +126,19 @@ class ContrastNet:
                     prob = F.softmax(out, dim=1)
                     probs[i][idxs] += F.softmax(out, dim=1).cpu()
         return probs
-    
+    def predict_prob_dropout(self, data, n_drop=10):
+        self.clf.train()
+        probs = torch.zeros([len(data), len(np.unique(data.Y))])
+        loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
+        for i in range(n_drop):
+            with torch.no_grad():
+                for x,x1, y, idxs in loader:
+                    x, y = x.to(self.device), y.to(self.device)
+                    out, e1 = self.clf(x)
+                    prob = F.softmax(out, dim=1)
+                    probs[idxs] += prob.cpu()
+        probs /= n_drop
+        return probs
     def get_model(self):
         return self.clf
 

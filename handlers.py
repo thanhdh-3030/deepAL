@@ -43,7 +43,7 @@ class CIFAR10_Handler(Dataset):
         x, y = self.X[index], self.Y[index]
         x = Image.fromarray(x)
         x1 = self.transform(x)
-        x2=self.transform(x)
+        x2 = self.transform(x)
         return x1,x2, y, index
 
     def __len__(self):
