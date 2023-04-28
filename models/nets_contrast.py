@@ -15,9 +15,9 @@ class ContrastNet:
         self.net = net
         self.params = params
         self.device = device
-        self.queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
-        self.queue=F.normalize(self.queue,dim=0)
-        self.queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
+        self.unlabel_queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
+        self.unlabel_queue=F.normalize(self.unlabel_queue,dim=0)
+        self.unlabel_queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
     def train(self, data):
         n_epoch = self.params['n_epoch']
         dim = data.X.shape[1:]
@@ -52,7 +52,7 @@ class ContrastNet:
 
                 # update memory bank
                 # update when queue size is divisible by batch size
-                if (int(self.queue_ptr)+key.shape[0])%self.params['memory_size']==0: 
+                if self.params['memory_size']%key.shape[0]==0: 
                     self._dequeue_and_enqueue(key)
         for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (x,_, y, idxs) in enumerate(loader):
@@ -78,12 +78,14 @@ class ContrastNet:
     def _dequeue_and_enqueue(self, keys):
         # gather keys before updating queue
         batch_size = keys.shape[0]
-        ptr = int(self.queue_ptr)
+        ptr = int(self.unlabel_queue_ptr)
+        print(self.queue_ptr)
+        print(batch_size)
         assert self.params['memory_size'] % batch_size == 0  # for simplicity
         # replace the keys at ptr (dequeue and enqueue)
-        self.queue[:, ptr : ptr + batch_size] = keys.T
+        self.unlabel_queue[:, ptr : ptr + batch_size] = keys.T
         ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
-        self.queue_ptr[0] = ptr
+        self.unlabel_queue_ptr[0] = ptr
     # def _compute_positive_contrastive_loss(self,keys,appeared_categories):
     #     """ Calculate contrastive loss enfoces the embeddings of same class
     #         to be close and different class far away.
