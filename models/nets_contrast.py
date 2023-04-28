@@ -42,7 +42,7 @@ class ContrastNet:
                 e2=F.normalize(e2,dim=1)
                 contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
                 ce_loss = F.cross_entropy(out, y)
-                total_loss=contrast_loss+ce_loss
+                total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
                 total_loss.backward()
                 optimizer.step()
 
@@ -51,12 +51,26 @@ class ContrastNet:
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 pred = out.max(1)[1]
                 preds[idxs] = pred.cpu()
         return preds
+    def predict_prob_dropout(self, data, n_drop=10):
+        self.clf.train()
+        probs = torch.zeros([len(data), len(np.unique(data.Y))])
+        loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
+        for i in range(n_drop):
+            with torch.no_grad():
+                for x,x1, y, idxs in loader:
+                    x, y = x.to(self.device), y.to(self.device)
+                    out, e1 = self.clf(x)
+                    prob = F.softmax(out, dim=1)
+                    probs[idxs] += prob.cpu()
+        probs /= n_drop
+        return probs
+    
     def _dequeue_and_enqueue(self,keys,labels,
                              category,bs):
         if category not in labels:
