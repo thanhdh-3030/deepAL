@@ -18,6 +18,9 @@ class ContrastNet:
         self.unlabel_queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
         self.unlabel_queue=F.normalize(self.unlabel_queue,dim=0)
         self.unlabel_queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
+        self.label_queue=torch.randn(self.params['num_class'],self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
+        self.label_queue=F.normalize(self.unlabel_queue,dim=1)
+        self.label_queue_ptr=torch.zeros((self.params['num_class'],1), dtype=torch.long) # (1,)
     def train(self, data):
         n_epoch = self.params['n_epoch']
         dim = data.X.shape[1:]
@@ -36,6 +39,9 @@ class ContrastNet:
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 out, query = self.clf(x1)
+                prob = F.softmax(out,dim=1)
+                pred=out.max(1)[1]
+                onebit_mask=(pred==y)
                 with torch.no_grad():  # no gradient to keys
                     _, key = self.clf(x2)
                 key=key.detach()
@@ -86,37 +92,58 @@ class ContrastNet:
         self.unlabel_queue[:, ptr : ptr + batch_size] = keys.T
         ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
         self.unlabel_queue_ptr[0] = ptr
-    # def _compute_positive_contrastive_loss(self,keys,appeared_categories):
-    #     """ Calculate contrastive loss enfoces the embeddings of same class
-    #         to be close and different class far away.
-    #     """
-    #     contrast_loss=0
-    #     for cls_ind in appeared_categories:
-    #         query=keys[list(appeared_categories).index(cls_ind)] # (1,D)
-    #         positive_keys= self.queue[cls_ind].clone().detach() # (M,D)
-    #         all_ids=[i for i in range (2)] # all classes
-    #         neg_ids=all_ids.copy().remove(cls_ind)
-    #         negative_keys=self.queue[neg_ids] # 
-    #     return 
+
     def _compute_unlabel_contrastive_loss(self,query,positive_key):
+        # get negative keys form unlabel memory bank
+        negative_keys=self.unlabel_queue.clone().detach()
+        contrast_loss=self._compute_contrast_loss(query,positive_key,negative_keys)
+        return contrast_loss
+    
+    def _compute_positive_contrastive_loss(self,query,keys_label,positive_key):
+        """ Calculate contrastive loss enfoces the embeddings of same class
+            to be close and different class far away.
+        """
+        # calculate augment postitive contrastive loss
+        negative_keys=self.unlabel_queue.clone().detach()
+        aug_contrast_loss=self._compute_contrast_loss(query,positive_key,negative_keys)
+
+        # calculate same class positive contrastive loss
+        same_positive_key=self.label_queue[keys_label][:,0] # get first embedding in label memory bank
+        same_contrast_loss=self._compute_contrast_loss(query,same_positive_key,negative_keys)
+
+        positive_contrast_loss=(aug_contrast_loss+same_contrast_loss)/2
+        return positive_contrast_loss
+    
+    def _compute_negative_contrastive_loss(self,query,keys_label,positive_key):
+        # get negative keys
+        diff_class_negative_keys=self.label_queue.clone().detach()[keys_label][:,:128] # negative keys have label model predict wrongly
+        diff_img_negative_keys=self.unlabel_queue.clone().detach()[:,:128] # negative keys formed by other images
+        negative_keys=torch.cat([diff_class_negative_keys,diff_img_negative_keys],dim=1)
+        contrast_loss=self._compute_contrast_loss(query,positive_key,negative_keys)
+        return contrast_loss    
+
+    def _compute_contrast_loss(self,query,positive_key,negative_keys):
         """ Calculates the unlabel contrastive loss for self-supervised learning.
         Args:
             query (torch.Tensor): Tensor with query samples (e.g. embeddings of the input).
                 (N,D) where D is embedding dim.
             positive_keys (torch.Tensor): Tensor with positive samples (e.g. embeddings of augmented input).
                 (N,D).
+            negative_keys (torch.Tensor): Tensor with negative samples (e.g. embeddings of augmented input).
+                (M,D).
         Returns:
             torch.Tensor: value of contrastive loss.
         """
         # normalize query features and positive key
         query=F.normalize(query,dim=1)
         positive_key=F.normalize(positive_key,dim=1)
+        negative_keys=F.normalize(negative_keys,dim=1)
         # compute logits
         # Einstein sum is more intuitive
         # positive logits: Nx1
         l_pos = torch.einsum("nc,nc->n", [query, positive_key]).unsqueeze(-1)
         # negative logits: NxK
-        l_neg = torch.einsum("nc,ck->nk", [query, self.queue.clone().detach()])
+        l_neg = torch.einsum("nc,ck->nk", [query, negative_keys])
         # logits: Nx(1+K)
         logits = torch.cat([l_pos, l_neg], dim=1)
         # apply temperature
@@ -125,6 +152,7 @@ class ContrastNet:
         labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
         contrast_loss=F.cross_entropy(logits,labels)
         return contrast_loss
+    
     def predict_prob(self, data):
         self.clf.eval()
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
