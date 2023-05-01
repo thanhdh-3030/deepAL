@@ -2,5 +2,6 @@ logfile/
 data/
 results/
 modelpara/
+wandb/
 *.pyc
 *.pth

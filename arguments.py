@@ -26,7 +26,8 @@ def get_args():
 	parser.add_argument('--initseed', '-s', default = 1001, type = int, help = 'Initial pool of labeled data')
 	parser.add_argument('--gpu', '-g', default = 0, type = str, help = 'which gpu')
 	parser.add_argument('--seed', default=4666, type=int, help='random seed')
-	
+	parser.add_argument('--use_wandb', '-w', default = False, help = 'use wandb to log training info')
+
 	# lpl
 	parser.add_argument('--lpl_epoches', type=int, default=20, help='lpl epoch num after detach')
 	# ceal

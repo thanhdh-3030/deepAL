@@ -1,5 +1,6 @@
 python main.py \
-    -a EntropySamplingDropout \
+    # -a EntropySamplingDropout \
+    -a LeastConfidence \
     -s 5000 \
     -q 15000 \
     -b 2500 \
