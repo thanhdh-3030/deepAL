@@ -36,10 +36,12 @@ class ContrastNet:
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 out, e1 = self.clf(x1)
-                _, e2 = self.clf(x2)
+                with torch.no_grad():
+                    _, e2 = self.clf(x2)
                 # normalize embedding 
                 e1=F.normalize(e1,dim=1)
                 e2=F.normalize(e2,dim=1)
+                e2.detach()
                 contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
                 ce_loss = F.cross_entropy(out, y)
                 total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
