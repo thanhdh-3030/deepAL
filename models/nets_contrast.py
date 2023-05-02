@@ -46,8 +46,8 @@ class ContrastNet:
                 # contrast_criterion=NTXentLoss(device=self.device,batch_size=x1.shape[0],temperature=0.1,use_cosine_similarity=False)
                 # contrast_loss=contrast_criterion(query,key)
                 ce_loss = F.cross_entropy(out, y)
-                total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
-                total_loss.backward()
+                # total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
+                ce_loss.backward()
                 optimizer.step()
 
                 # update memory bank

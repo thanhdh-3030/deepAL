@@ -31,7 +31,7 @@ class Net:
 
         loader = DataLoader(data, shuffle=True, **self.params['loader_tr_args'])
         for epoch in tqdm(range(1, n_epoch+1), ncols=100):
-            for batch_idx, (x, y, idxs) in enumerate(loader):
+            for batch_idx, (x,x1, y, idxs) in enumerate(loader):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 out,x= self.clf(x)
@@ -44,7 +44,7 @@ class Net:
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 pred = out.max(1)[1]
@@ -56,7 +56,7 @@ class Net:
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,_, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 prob = F.softmax(out, dim=1)

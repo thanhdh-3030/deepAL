@@ -11,7 +11,7 @@ import copy
 def get_args():
 	parser = argparse.ArgumentParser(description='Extended Deep Active Learning Toolkit')
 	#basic arguments
-	parser.add_argument('--ALstrategy', '-a', default='EntropySampling', type=str, help='name of active learning strategies')
+	parser.add_argument('--ALstrategy', '-a', default='LossPredictionLoss', type=str, help='name of active learning strategies')
 	parser.add_argument('--quota', '-q', default=1000, type=int, help='quota of active learning')
 	parser.add_argument('--batch', '-b', default=128, type=int, help='batch size in one active learning iteration')
 	parser.add_argument('--dataset_name', '-d', default='CIFAR10', type=str, help='dataset name')
@@ -22,11 +22,11 @@ def get_args():
 	#parser.add_argument('--help', '-h', default=False, action='store_true', help='verbose')
 	parser.add_argument('--cuda', action='store_true', help='If training is to be done on a GPU')
 	#parser.add_argument('--model', '-m', default='ResNet18', type=str, help='model name')
-	parser.add_argument('--use_contrast', '-m', default=True, help='use contrastive loss')
+	parser.add_argument('--use_contrast', '-c', default=False,action=argparse.BooleanOptionalAction, help='use contrastive loss')
 	parser.add_argument('--initseed', '-s', default = 1001, type = int, help = 'Initial pool of labeled data')
 	parser.add_argument('--gpu', '-g', default = 0, type = str, help = 'which gpu')
 	parser.add_argument('--seed', default=4666, type=int, help='random seed')
-	parser.add_argument('--use_wandb', '-w', default = False, help = 'use wandb to log training info')
+	parser.add_argument('--use_wandb', '-w', default = False,action=argparse.BooleanOptionalAction,help = 'use wandb to log training info')
 
 	# lpl
 	parser.add_argument('--lpl_epoches', type=int, default=20, help='lpl epoch num after detach')

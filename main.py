@@ -45,11 +45,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 sys.stdout = Logger(os.path.abspath('') + '/logfile/' + DATA_NAME+ '_'  + STRATEGY_NAME + '_' +'contrastive_'+str(args_input.use_contrast)+'_'+str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_log.txt')
 warnings.filterwarnings('ignore')
 experiment_name=STRATEGY_NAME+'_' +'contrastive_'+str(args_input.use_contrast)
-if args_input.use_wandb:
-	 wandb.init(project="Active Learning",
-                group=experiment_name,
-                name='(1)',
-                entity='ssl-online')
+
 # start experiment
 
 iteration = args_input.iteration
@@ -58,7 +54,13 @@ all_acc = []
 acq_time = []
 
 # repeate # iteration trials
-while (iteration > 0): 
+while (iteration > 0):
+	# init wandb
+	if args_input.use_wandb:
+		wandb.init(project="Active Learning",
+					group=experiment_name,
+					name=str(iteration),
+					entity='ssl-online')
 	iteration = iteration - 1
 
 	# data, network, strategy
@@ -103,7 +105,7 @@ while (iteration > 0):
 	acc[0] = dataset.cal_test_acc(preds)
 	print('Round 0\ntesting accuracy {}'.format(acc[0]))
 	print('\n')
-	wandb.log({'acc':acc[0],'round':0})
+	wandb.log({'acc':acc[0],'round':0},step=0)
 	# round 1 to rd
 	for rd in range(1, NUM_ROUND+1):
 		print('Round {}'.format(rd))
@@ -131,7 +133,7 @@ while (iteration > 0):
 		acc[rd] = dataset.cal_test_acc(preds)
 		print('testing accuracy {}'.format(acc[rd]))
 		print('\n')
-		wandb.log({'acc':acc[rd],'round':rd})
+		wandb.log({'acc':acc[rd],'round':rd},step=rd)
 
 		#torch.cuda.empty_cache()
 	
