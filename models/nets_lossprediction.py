@@ -58,7 +58,7 @@ class Net_LPL:
         self.clf.train()
         self.clf_lpl.train()
         for epoch in tqdm(range(1, n_epoch+1), ncols=100):
-            for batch_idx, (x, y, idxs) in enumerate(loader):
+            for batch_idx, (x,x1, y, idxs) in enumerate(loader):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 optimizer_lpl.zero_grad()
@@ -86,7 +86,7 @@ class Net_LPL:
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 pred = out.max(1)[1]
@@ -98,7 +98,7 @@ class Net_LPL:
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 prob = F.softmax(out, dim=1)

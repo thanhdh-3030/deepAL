@@ -36,16 +36,16 @@ class ContrastNet:
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
                 out, e1 = self.clf(x1)
-                with torch.no_grad():
-                    _, e2 = self.clf(x2)
-                # normalize embedding 
-                e1=F.normalize(e1,dim=1)
-                e2=F.normalize(e2,dim=1)
-                e2.detach()
-                contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
+                # with torch.no_grad():
+                #     _, e2 = self.clf(x2)
+                # # normalize embedding 
+                # e1=F.normalize(e1,dim=1)
+                # e2=F.normalize(e2,dim=1)
+                # e2.detach()
+                # contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
                 ce_loss = F.cross_entropy(out, y)
-                total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
-                total_loss.backward()
+                # total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
+                ce_loss.backward()
                 optimizer.step()
 
     def predict(self, data):
@@ -116,7 +116,7 @@ class ContrastNet:
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
-            for x, y, idxs in loader:
+            for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
                 out, e1 = self.clf(x)
                 prob = F.softmax(out, dim=1)
@@ -134,6 +134,17 @@ class ContrastNet:
                     prob = F.softmax(out, dim=1)
                     probs[i][idxs] += F.softmax(out, dim=1).cpu()
         return probs
+    def get_embeddings(self, data):
+        self.clf.eval()
+        # embeddings = torch.zeros([len(data), self.clf.get_embedding_dim()])
+        embeddings = torch.zeros([len(data), 512])
+        loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
+        with torch.no_grad():
+            for x,x1, y, idxs in loader:
+                x, y = x.to(self.device), y.to(self.device)
+                out, e1 = self.clf(x)
+                embeddings[idxs] = e1.cpu()
+        return embeddings
     
     def get_model(self):
         return self.clf
