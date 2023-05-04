@@ -1,5 +1,5 @@
 python main.py \
-    -a EntropySamplingDropout \
+    -a VAAL \
     -s 5000 \
     -q 15000 \
     -b 2500 \
@@ -7,4 +7,4 @@ python main.py \
     -t 6 \
     -g 0 \
     -w \
-    --seed 4666 \
+    -c \
