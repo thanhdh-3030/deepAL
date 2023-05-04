@@ -55,13 +55,12 @@ acq_time = []
 
 # repeate # iteration trials
 while (iteration > 0):
-	# init wandb
 	if args_input.use_wandb:
 		wandb.init(project="Active Learning",
 					group=experiment_name,
 					name=str(iteration),
 					entity='ssl-online',
-					reinit=True)
+					reinit=True) 
 	iteration = iteration - 1
 
 	# data, network, strategy
