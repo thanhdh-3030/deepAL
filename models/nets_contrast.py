@@ -32,22 +32,29 @@ class ContrastNet:
 
         loader = DataLoader(data, shuffle=True, **self.params['loader_tr_args'])
         for epoch in tqdm(range(1, n_epoch+1), ncols=100):
-            for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
-                x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
-                optimizer.zero_grad()
-                out, e1 = self.clf(x1)
-                with torch.no_grad():
-                    _, e2 = self.clf(x2)
-                # normalize embedding 
-                e1=F.normalize(e1,dim=1)
-                e2=F.normalize(e2,dim=1)
-                e2.detach()
-                contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
-                ce_loss = F.cross_entropy(out, y)
-                total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
-                total_loss.backward()
-                optimizer.step()
-
+            if(epoch< int(n_epoch/2)):
+                for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
+                    x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
+                    optimizer.zero_grad()
+                    out, e1 = self.clf(x1)
+                    with torch.no_grad():
+                        _, e2 = self.clf(x2)
+                    # normalize embedding 
+                    e1=F.normalize(e1,dim=1)
+                    e2=F.normalize(e2,dim=1)
+                    e2.detach()
+                    contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
+                    ce_loss = F.cross_entropy(out, y)
+                    total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
+                    total_loss.backward()
+                    optimizer.step()
+            else:
+                for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
+                    x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
+                    optimizer.zero_grad()
+                    out, e1 = self.clf(x1)
+                    ce_loss = F.cross_entropy(out, y)
+                    optimizer.step()
     def predict(self, data):
         self.clf.eval()
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
