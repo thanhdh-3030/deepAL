@@ -44,7 +44,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 #recording
 sys.stdout = Logger(os.path.abspath('') + '/logfile/' + DATA_NAME+ '_'  + STRATEGY_NAME + '_' +'contrastive_'+str(args_input.use_contrast)+'_'+str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_log.txt')
 warnings.filterwarnings('ignore')
-experiment_name=STRATEGY_NAME+'_' +'contrastive_'+str(args_input.use_contrast)
+experiment_name=STRATEGY_NAME+'_' +'contrastive'if args_input.use_contrast else STRATEGY_NAME
 
 # start experiment
 
@@ -56,7 +56,7 @@ acq_time = []
 # repeate # iteration trials
 while (iteration > 0):
 	if args_input.use_wandb:
-		wandb.init(project="Active Learning",
+		wandb.init(project="Classification-Active-Learning",
 					group=experiment_name,
 					name=str(iteration),
 					entity='ssl-online',

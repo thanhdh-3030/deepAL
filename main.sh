@@ -7,4 +7,3 @@ python main.py \
     -t 6 \
     -g 0 \
     -w \
-    -c \
