@@ -60,7 +60,8 @@ while (iteration > 0):
 		wandb.init(project="Active Learning",
 					group=experiment_name,
 					name=str(iteration),
-					entity='ssl-online')
+					entity='ssl-online',
+					reinit=True)
 	iteration = iteration - 1
 
 	# data, network, strategy
