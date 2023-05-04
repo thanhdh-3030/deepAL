@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable, grad
-
+from tqdm import tqdm
 '''
 This implementation is with reference of https://github.com/sinhasam/vaal.
 You need to write task-specific VAE in nets.py if you plan to apply this method in new task.
@@ -41,14 +41,16 @@ class VAAL(Strategy):
 		dim = self.dataset.X_train.shape[1:]
 		self.vae = self.net_vae().cuda()
 		self.dis = self.net_dis().cuda()
-		if self.args_task['optimizer'] == 'Adam':
-			opt_vae = optim.Adam(self.vae.parameters(), **self.args_task['optimizer_args'])
-			opt_dis = optim.Adam(self.dis.parameters(), **self.args_task['optimizer_args'])
-		elif self.args_task['optimizer'] == 'SGD':
-			opt_vae = optim.SGD(self.vae.parameters(), **self.args_task['optimizer_args'])
-			opt_dis = optim.SGD(self.dis.parameters(), **self.args_task['optimizer_args'])
-		else:
-			raise NotImplementedError
+		# if self.args_task['optimizer'] == 'Adam':
+		# 	opt_vae = optim.Adam(self.vae.parameters(), **self.args_task['optimizer_args'])
+		# 	opt_dis = optim.Adam(self.dis.parameters(), **self.args_task['optimizer_args'])
+		# elif self.args_task['optimizer'] == 'SGD':
+		# 	opt_vae = optim.SGD(self.vae.parameters(), **self.args_task['optimizer_args'])
+		# 	opt_dis = optim.SGD(self.dis.parameters(), **self.args_task['optimizer_args'])
+		# else:
+		# 	raise NotImplementedError
+		opt_vae = optim.Adam(self.vae.parameters(),lr=5e-4)
+		opt_dis = optim.Adam(self.dis.parameters(),lr=5e-4)
 
 		#labeled and unlabeled data
 		X_labeled, Y_labeled = self.dataset.get_partial_labeled_data()
@@ -58,7 +60,7 @@ class VAAL(Strategy):
 		loader_tr = DataLoader(self.handler_joint(X_labeled, Y_labeled,X_unlabeled, Y_unlabeled,
 											transform = self.args_task['transform_train']), shuffle= True, **self.args_task['loader_tr_args'])
 		
-		for epoch in range(n_epoch):
+		for epoch in tqdm(range(n_epoch)):
 
 			self.vae.train()
 			self.dis.train()
