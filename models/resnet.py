@@ -100,10 +100,20 @@ class ResNet(nn.Module):
         out = self.layer4(out)
         out = F.avg_pool2d(out, 4)
         # out = out.view(out.size(0), -1)
-        x = out.view(out.size(0), -1)
-        out = self.linear(x)
-        return out,x
-
+        embed = out.view(out.size(0), -1)
+        out = self.linear(embed)
+        return out,embed
+    def forward_ll(self, x):
+        out = F.relu(self.bn1(self.conv1(x)))
+        out1 = self.layer1(out)
+        out2 = self.layer2(out1)
+        out3 = self.layer3(out2)
+        out4 = self.layer4(out3)
+        out = F.avg_pool2d(out4, 4)
+        out = out.view(out.size(0), -1)
+        out = self.linear(out)
+        return out, [out1, out2, out3, out4]
+ 
 
 def ResNet18():
     return ResNet(BasicBlock, [2, 2, 2, 2])
