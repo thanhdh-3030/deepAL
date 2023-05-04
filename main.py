@@ -106,7 +106,8 @@ while (iteration > 0):
 	acc[0] = dataset.cal_test_acc(preds)
 	print('Round 0\ntesting accuracy {}'.format(acc[0]))
 	print('\n')
-	wandb.log({'acc':acc[0],'round':0},step=0)
+	if args_input.use_wandb:
+		wandb.log({'acc':acc[0],'round':0},step=0)
 	# round 1 to rd
 	for rd in range(1, NUM_ROUND+1):
 		print('Round {}'.format(rd))
@@ -134,7 +135,8 @@ while (iteration > 0):
 		acc[rd] = dataset.cal_test_acc(preds)
 		print('testing accuracy {}'.format(acc[rd]))
 		print('\n')
-		wandb.log({'acc':acc[rd],'round':rd},step=rd)
+		if args_input.use_wandb:
+			wandb.log({'acc':acc[rd],'round':rd},step=rd)
 
 		#torch.cuda.empty_cache()
 	

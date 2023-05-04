@@ -69,7 +69,7 @@ class Net:
 		loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
 		for i in range(n_drop):
 			with torch.no_grad():
-				for x, y, idxs in loader:
+				for x,_, y, idxs in loader:
 					x, y = x.to(self.device), y.to(self.device)
 					out, e1 = self.clf(x)
 					prob = F.softmax(out, dim=1)
