@@ -170,7 +170,8 @@ def get_net_lpl(name, args_task, device):
 	elif name == 'SVHN':
 		return Net_LPL(CIFAR10_Net_LPL, args_task, device, loss_net)
 	elif name == 'CIFAR10':
-		return Net_LPL(CIFAR10_Net_LPL, args_task, device, loss_net)
+		# return Net_LPL(CIFAR10_Net_LPL, args_task, device, loss_net)
+		return Net_LPL(ResNet18(), args_task, device, loss_net)
 	elif name == 'CIFAR10_imb':
 		return Net_LPL(CIFAR10_Net_LPL, args_task, device, loss_net)
 	elif name == 'CIFAR100':

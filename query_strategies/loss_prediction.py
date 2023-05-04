@@ -31,9 +31,9 @@ class LossPredictionLoss(Strategy):
 		self.net.clf_lpl.eval()
 		uncertainty = torch.tensor([]).cuda()
 		with torch.no_grad():
-			for x, y, idxs in loader:
+			for x,_, y, idxs in loader:
 				x, y = x.cuda(), y.cuda()
-				out, feature = self.net.clf(x)
+				out, feature = self.net.clf.forward_ll(x)
 				pred_loss = self.net.clf_lpl(feature)
 				pred_loss = pred_loss.view(pred_loss.size(0))
 				uncertainty = torch.cat((uncertainty, pred_loss), 0)
