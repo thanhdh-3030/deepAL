@@ -15,9 +15,9 @@ class ContrastNet:
         self.net = net
         self.params = params
         self.device = device
-        self.queue=torch.randn(self.params['num_class'],self.params['memory_size'],self.params['embedding_dim']) # (C,M,D)
-        self.queue=torch.nn.functional.normalize(self.queue,p=2,dim=2)
-        self.queue_ptr=torch.zeros(self.params['num_class'],dtype=torch.long) # (C,)
+        self.queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
+        self.queue=torch.nn.functional.normalize(self.queue,dim=0)
+        self.queue_ptr=torch.zeros(self.params['num_class'],dtype=torch.long) # (1,)
     def train(self, data):
         n_epoch = self.params['n_epoch']
         dim = data.X.shape[1:]
@@ -36,18 +36,22 @@ class ContrastNet:
                 for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
                     x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                     optimizer.zero_grad()
-                    out, e1 = self.clf(x1)
+                    out, query = self.clf(x1)
                     with torch.no_grad():
-                        _, e2 = self.clf(x2)
+                        _, key = self.clf(x2)
                     # normalize embedding 
-                    e1=F.normalize(e1,dim=1)
-                    e2=F.normalize(e2,dim=1)
-                    e2.detach()
-                    contrast_loss=self._compute_unlabel_contrastive_loss(e1,e2)
+                    query=F.normalize(query,dim=1)
+                    key=F.normalize(key,dim=1)
+                    key.detach()
+                    contrast_loss=self._compute_unlabel_contrastive_loss(query,key)
                     ce_loss = F.cross_entropy(out, y)
                     total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
                     total_loss.backward()
                     optimizer.step()
+                    # update memory bank
+                    # update when queue size is divisible by batch size
+                    if (int(self.queue_ptr)+key.shape[0])%self.params['memory_size']==0: 
+                        self._dequeue_and_enqueue(key)
             else:
                 for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
                     x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
@@ -80,28 +84,36 @@ class ContrastNet:
         probs /= n_drop
         return probs
     
-    def _dequeue_and_enqueue(self,keys,labels,
-                             category,bs):
-        if category not in labels:
-            return
-        keys=keys[list(labels).index(category)]
-        ptr=int(self.queue_ptr[category])
-        self.queue[category,:,ptr]=keys
-        self.queue_ptr[category]=(ptr+bs)%self.queue_len
-    # def _compute_positive_contrastive_loss(self,keys,appeared_categories):
-    #     """ Calculate contrastive loss enfoces the embeddings of same class
-    #         to be close and different class far away.
+    @torch.no_grad()
+    def _dequeue_and_enqueue(self, keys):
+        # gather keys before updating queue
+        batch_size = keys.shape[0]
+        ptr = int(self.queue_ptr)
+        assert self.params['memory_size'] % batch_size == 0  # for simplicity
+        # replace the keys at ptr (dequeue and enqueue)
+        self.queue[:, ptr : ptr + batch_size] = keys.T
+        ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
+        self.queue_ptr[0] = ptr 
+    # def _compute_unlabel_contrastive_loss(self,query,positive_key):
+    #     """ Calculates the contrastive loss for self-supervised learning.
+    #     Args:
+    #         query (torch.Tensor): Tensor with query samples (e.g. embeddings of the input).
+    #             (N,D) where D is embedding dim.
+    #         positive_keys (torch.Tensor): Tensor with positive samples (e.g. embeddings of augmented input).
+    #             (N,D).
+    #     Returns:
+    #         torch.Tensor: value of contrastive loss.
     #     """
-    #     contrast_loss=0
-    #     for cls_ind in appeared_categories:
-    #         query=keys[list(appeared_categories).index(cls_ind)] # (1,D)
-    #         positive_keys= self.queue[cls_ind].clone().detach() # (M,D)
-    #         all_ids=[i for i in range (2)] # all classes
-    #         neg_ids=all_ids.copy().remove(cls_ind)
-    #         negative_keys=self.queue[neg_ids] # 
-    #     return 
+    #     # Negative keys are implicitly off-diagonal positive keys.
+
+    #     # Cosine between all combinations
+    #     logits = query @ positive_key.transpose(-2,-1)
+    #     # Positive keys are the entries on the diagonal
+    #     labels = torch.arange(len(query), device=query.device)
+    #     contrastive_loss=F.cross_entropy(logits/self.params['temperature'],labels)
+    #     return contrastive_loss
     def _compute_unlabel_contrastive_loss(self,query,positive_key):
-        """ Calculates the contrastive loss for self-supervised learning.
+        """ Calculates the unlabel contrastive loss for self-supervised learning.
         Args:
             query (torch.Tensor): Tensor with query samples (e.g. embeddings of the input).
                 (N,D) where D is embedding dim.
@@ -110,14 +122,23 @@ class ContrastNet:
         Returns:
             torch.Tensor: value of contrastive loss.
         """
-        # Negative keys are implicitly off-diagonal positive keys.
-
-        # Cosine between all combinations
-        logits = query @ positive_key.transpose(-2,-1)
-        # Positive keys are the entries on the diagonal
-        labels = torch.arange(len(query), device=query.device)
-        contrastive_loss=F.cross_entropy(logits/self.params['temperature'],labels)
-        return contrastive_loss
+        # normalize query features and positive key
+        query=F.normalize(query,dim=1)
+        positive_key=F.normalize(positive_key,dim=1)
+        # compute logits
+        # Einstein sum is more intuitive
+        # positive logits: Nx1
+        l_pos = torch.einsum("nc,nc->n", [query, positive_key]).unsqueeze(-1)
+        # negative logits: NxK
+        l_neg = torch.einsum("nc,ck->nk", [query, self.queue.clone().detach()])
+        # logits: Nx(1+K)
+        logits = torch.cat([l_pos, l_neg], dim=1)
+        # apply temperature
+        logits /= self.params['temperature']
+        # labels: positive key indicators
+        labels = torch.zeros(logits.shape[0], dtype=torch.long).cuda()
+        contrast_loss=F.cross_entropy(logits,labels)
+        return contrast_loss
     def predict_prob(self, data):
         self.clf.eval()
         probs = torch.zeros([len(data), len(np.unique(data.Y))])

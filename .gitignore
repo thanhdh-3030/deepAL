@@ -3,5 +3,6 @@ data/
 results/
 modelpara/
 wandb/
+.vscode/
 *.pyc
 *.pth
