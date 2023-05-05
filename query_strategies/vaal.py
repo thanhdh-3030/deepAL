@@ -118,7 +118,7 @@ class VAAL(Strategy):
 		scores = torch.zeros(len(data))
 
 		with torch.no_grad():
-			for x, y, idxs in loader_te:
+			for x,_, y, idxs in loader_te:
 				x, y = x.cuda(), y.cuda()
 				_,_,mu,_ = self.vae(x)
 				out = self.dis(mu).cpu()
