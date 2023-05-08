@@ -5,3 +5,4 @@ modelpara/
 wandb/
 *.pyc
 *.pth
+*.xml
