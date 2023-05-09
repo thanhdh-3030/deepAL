@@ -44,7 +44,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 #recording
 sys.stdout = Logger(os.path.abspath('') + '/logfile/' + DATA_NAME+ '_'  + STRATEGY_NAME + '_' +'contrastive_'+str(args_input.use_contrast)+'_'+str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_log.txt')
 warnings.filterwarnings('ignore')
-experiment_name=STRATEGY_NAME+'_' +'contrastive'+'_moco'if args_input.use_contrast else STRATEGY_NAME
+experiment_name=STRATEGY_NAME+'_' +'contrastive'+'_moco_mb'if args_input.use_contrast else STRATEGY_NAME
 
 # start experiment
 

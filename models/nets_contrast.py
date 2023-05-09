@@ -46,13 +46,14 @@ class ContrastNet:
                 # contrast_criterion=NTXentLoss(device=self.device,batch_size=x1.shape[0],temperature=0.1,use_cosine_similarity=False)
                 # contrast_loss=contrast_criterion(query,key)
                 ce_loss = F.cross_entropy(out, y)
-                # total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
-                ce_loss.backward()
+                total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
+                # ce_loss.backward()
+                total_loss.backward()
                 optimizer.step()
 
                 # update memory bank
                 # update when queue size is divisible by batch size
-                if (int(self.queue_ptr)+key.shape[0])%self.params['memory_size']==0: 
+                if key.shape[0]==self.params['loader_tr_args']['batch_size']: 
                     self._dequeue_and_enqueue(key)
         for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (x,_, y, idxs) in enumerate(loader):
