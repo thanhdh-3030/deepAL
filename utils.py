@@ -156,7 +156,7 @@ def get_net(name, args_task, device):
 # contrastive net
 def get_contrast_net(name, args_task, device):
 	if name=='CIFAR10':
-		return ContrastNet(ResNet18(),args_task,device)
+		return ContrastNet(args_task,device)
 def get_net_lpl(name, args_task, device):
 	loss_net = get_lossnet(args_task['name'])
 	if name == 'MNIST':

@@ -10,23 +10,34 @@ from copy import deepcopy
 from tqdm import tqdm
 import torch.nn.init as init
 from models.nt_xent_loss import NTXentLoss
+from models.resnet import ResNet18
+
 class ContrastNet:
-    def __init__(self, net, params, device,):
-        self.net = net
+    def __init__(self, params, device,):
+        # self.net = net
         self.params = params
         self.device = device
         self.queue=torch.randn(self.params['embedding_dim'],self.params['memory_size']).cuda() # (K,D)
         self.queue=F.normalize(self.queue,dim=0)
         self.queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
+        self.clf_query=ResNet18().to(self.device)
+        self.clf_key=ResNet18().to(self.device)
+
+        # Freeze clf key
+        for param_q, param_k in zip(self.clf_query.parameters(), self.clf_key.parameters()):
+            param_k.data.copy_(param_q.data)  # initialize
+            param_k.requires_grad = False  # not update by gradient
     def train(self, data):
         n_epoch = self.params['n_epoch']
         dim = data.X.shape[1:]
-        self.clf = self.net.to(self.device)
-        self.clf.train()
+        # self.clf = self.net.to(self.device)
+        # self.clf.train()
+        self.clf_query.train()
         if self.params['optimizer'] == 'Adam':
-            optimizer = optim.Adam(self.clf.parameters(), **self.params['optimizer_args'])
+            optimizer = optim.Adam(self.clf_query.parameters(), **self.params['optimizer_args'])
         elif self.params['optimizer'] == 'SGD':
-            optimizer = optim.SGD(self.clf.parameters(), **self.params['optimizer_args'])
+            # optimizer = optim.SGD(self.clf.parameters(), **self.params['optimizer_args'])
+                optimizer = optim.SGD(self.clf_query.parameters(), **self.params['optimizer_args'])
         else:
             raise NotImplementedError
 
@@ -35,13 +46,12 @@ class ContrastNet:
             for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
-                out, query = self.clf(x1)
+                out, query = self.clf_query(x1)
+                query=F.normalize(query,dim=1)  # normalize embedding
                 with torch.no_grad():  # no gradient to keys
-                    _, key = self.clf(x2)
-                key=key.detach()
-                # normalize embedding
-                query=F.normalize(query,dim=1)
-                key=F.normalize(key,dim=1)
+                    self._momentum_update_key_encoder()  # update the key encoder
+                    _, key = self.clf_key(x2)
+                    key=F.normalize(key,dim=1)
                 contrast_loss=self._compute_unlabel_contrastive_loss(query,key)
                 # contrast_criterion=NTXentLoss(device=self.device,batch_size=x1.shape[0],temperature=0.1,use_cosine_similarity=False)
                 # contrast_loss=contrast_criterion(query,key)
@@ -59,18 +69,18 @@ class ContrastNet:
             for batch_idx, (x,_, y, idxs) in enumerate(loader):
                 x, y = x.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
-                out, e1 = self.clf(x)
+                out, e1 = self.clf_query(x)
                 ce_loss = F.cross_entropy(out, y)
                 ce_loss.backward()
                 optimizer.step()
     def predict(self, data):
-        self.clf.eval()
+        self.clf_query.eval()
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
             for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
-                out, e1 = self.clf(x)
+                out, e1 = self.clf_query(x)
                 pred = out.max(1)[1]
                 preds[idxs] = pred.cpu()
         return preds
@@ -85,6 +95,13 @@ class ContrastNet:
         self.queue[:, ptr : ptr + batch_size] = keys.T
         ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
         self.queue_ptr[0] = ptr
+    @torch.no_grad()
+    def _momentum_update_key_encoder(self):
+        """
+        Momentum update of the key encoder
+        """
+        for param_q, param_k in zip(self.clf_query.parameters(), self.clf_key.parameters()):
+            param_k.data = param_k.data * self.params['moco_momentum'] + param_q.data * (1.0 - self.params['moco_momentum'])
     # def _compute_positive_contrastive_loss(self,keys,appeared_categories):
     #     """ Calculate contrastive loss enfoces the embeddings of same class
     #         to be close and different class far away.
@@ -125,43 +142,43 @@ class ContrastNet:
         contrast_loss=F.cross_entropy(logits,labels)
         return contrast_loss
     def predict_prob(self, data):
-        self.clf.eval()
+        self.clf_query.eval()
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         with torch.no_grad():
             for x,x1, y, idxs in loader:
                 x, y = x.to(self.device), y.to(self.device)
-                out, e1 = self.clf(x)
+                out, e1 = self.clf_query(x)
                 prob = F.softmax(out, dim=1)
                 probs[idxs] = prob.cpu()
         return probs
     def predict_prob_dropout_split(self, data, n_drop=10):
-        self.clf.train()
+        self.clf_query.train()
         probs = torch.zeros([n_drop, len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         for i in range(n_drop):
             with torch.no_grad():
                 for x, y, idxs in loader:
                     x, y = x.to(self.device), y.to(self.device)
-                    out, e1 = self.clf(x)
+                    out, e1 = self.clf_query(x)
                     prob = F.softmax(out, dim=1)
                     probs[i][idxs] += F.softmax(out, dim=1).cpu()
         return probs
     def predict_prob_dropout(self, data, n_drop=10):
-        self.clf.train()
+        self.clf_query.train()
         probs = torch.zeros([len(data), len(np.unique(data.Y))])
         loader = DataLoader(data, shuffle=False, **self.params['loader_te_args'])
         for i in range(n_drop):
             with torch.no_grad():
                 for x,x1, y, idxs in loader:
                     x, y = x.to(self.device), y.to(self.device)
-                    out, e1 = self.clf(x)
+                    out, e1 = self.clf_query(x)
                     prob = F.softmax(out, dim=1)
                     probs[idxs] += prob.cpu()
         probs /= n_drop
         return probs
     def get_model(self):
-        return self.clf
+        return self.clf_query
 
  
  
