@@ -42,7 +42,8 @@ class ContrastNet:
             raise NotImplementedError
 
         loader = DataLoader(data, shuffle=True, **self.params['loader_tr_args'])
-        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
+        # for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
+        for epoch in tqdm(range(1, int(n_epoch)+1), ncols=100):
             for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
                 x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
                 optimizer.zero_grad()
@@ -65,14 +66,14 @@ class ContrastNet:
                 # update when queue size is divisible by batch size
                 if key.shape[0]==self.params['loader_tr_args']['batch_size']: 
                     self._dequeue_and_enqueue(key)
-        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
-            for batch_idx, (x,_, y, idxs) in enumerate(loader):
-                x, y = x.to(self.device), y.to(self.device)
-                optimizer.zero_grad()
-                out, e1 = self.clf_query(x)
-                ce_loss = F.cross_entropy(out, y)
-                ce_loss.backward()
-                optimizer.step()
+        # for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
+        #     for batch_idx, (x,_, y, idxs) in enumerate(loader):
+        #         x, y = x.to(self.device), y.to(self.device)
+        #         optimizer.zero_grad()
+        #         out, e1 = self.clf_query(x)
+        #         ce_loss = F.cross_entropy(out, y)
+        #         ce_loss.backward()
+        #         optimizer.step()
     def predict(self, data):
         self.clf_query.eval()
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
