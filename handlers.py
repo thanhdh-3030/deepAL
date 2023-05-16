@@ -244,10 +244,11 @@ class CIFAR10_Handler_joint(Dataset):
         if self.transform is not None:
 
             x_1 = Image.fromarray(x_1)
-            x_1 = self.transform(x_1)
+            x_11 = self.transform(x_1)
+            x_12 = self.transform(x_1)
 
             x_2 = Image.fromarray(x_2)
             x_21 = self.transform(x_2)
             x_22 = self.transform(x_2)
 
-        return index,x_1,y_1,x_21,x_22,y_2
+        return index,x_11,x_12,y_1,x_21,x_22,y_2
