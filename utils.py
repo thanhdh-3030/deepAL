@@ -7,6 +7,7 @@ from models.nets_lossprediction import Net_LPL, MNIST_Net_LPL, CIFAR10_Net_LPL, 
 from models.nets_waal import Net_WAAL, MNIST_Net_WAAL, CIFAR10_Net_WAAL, waterbirds_Net_WAAL, CLF_WAAL, Discriminator
 from models.resnet import ResNet18
 from models.nets_contrast import ContrastNet
+from models.net_onebit import OnebitNet
 from query_strategies import RandomSampling, LeastConfidence, MarginSampling, EntropySampling, \
 								LeastConfidenceDropout, MarginSamplingDropout, EntropySamplingDropout, \
 								KMeansSampling, KMeansSamplingGPU, KCenterGreedy, KCenterGreedyPCA, BALDDropout,  \
@@ -157,6 +158,10 @@ def get_net(name, args_task, device):
 def get_contrast_net(name, args_task, device):
 	if name=='CIFAR10':
 		return ContrastNet(args_task,device)
+def get_net_onebit(name,args_task,device):
+	handler_joint= get_handler_joint(args_task['name'])
+	if name=='CIFAR10':
+		return OnebitNet(args_task,device,handler_joint)
 def get_net_lpl(name, args_task, device):
 	loss_net = get_lossnet(args_task['name'])
 	if name == 'MNIST':
@@ -276,6 +281,8 @@ def get_strategy(STRATEGY_NAME, dataset, net, args_input, args_task):
 		return VAAL(dataset, net, args_input, args_task, net_vae = net_vae, net_dis = net_disc, handler_joint = handler_joint)
 	elif STRATEGY_NAME == 'WAAL':
 		return WAAL(dataset, net, args_input, args_task)
+	elif STRATEGY_NAME == 'OneBit':
+		return EntropySamplingDropout(dataset, net, args_input, args_task)	
 	else:
 		raise NotImplementedError
 

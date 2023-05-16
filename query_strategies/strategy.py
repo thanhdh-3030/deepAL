@@ -39,6 +39,10 @@ class Strategy:
                 X_labeled, Y_labeled = self.dataset.get_partial_labeled_data()
                 X_unlabeled, Y_unlabeled = self.dataset.get_partial_unlabeled_data()
                 self.net.train(labeled_data, X_labeled, Y_labeled,X_unlabeled, Y_unlabeled)
+            elif model_name=='OneBit':
+                X_labeled, Y_labeled = self.dataset.get_partial_labeled_data()
+                X_unlabeled, Y_unlabeled = self.dataset.get_partial_unlabeled_data()
+                self.net.train(X_labeled, Y_labeled,X_unlabeled, Y_unlabeled)
             else:
                 raise NotImplementedError
 

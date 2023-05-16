@@ -12,8 +12,8 @@ import torch.nn.init as init
 from models.nt_xent_loss import NTXentLoss
 from models.resnet import ResNet18
 
-class ContrastNet:
-    def __init__(self, params, device,):
+class OnebitNet:
+    def __init__(self, params, device,handler):
         # self.net = net
         self.params = params
         self.device = device
@@ -22,14 +22,14 @@ class ContrastNet:
         self.queue_ptr=torch.zeros(1, dtype=torch.long) # (1,)
         self.clf_query=ResNet18().to(self.device)
         self.clf_key=ResNet18().to(self.device)
-
+        self.handler=handler
         # Freeze clf key
         for param_q, param_k in zip(self.clf_query.parameters(), self.clf_key.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
-    def train(self, data):
+    def train(self,X_labeled, Y_labeled,X_unlabeled, Y_unlabeled):
         n_epoch = self.params['n_epoch']
-        dim = data.X.shape[1:]
+        # dim = labeled_data.X.shape[1:]
         # self.clf = self.net.to(self.device)
         # self.clf.train()
         self.clf_query.train()
@@ -41,22 +41,24 @@ class ContrastNet:
         else:
             raise NotImplementedError
 
-        loader = DataLoader(data, shuffle=True, **self.params['loader_tr_args'])
-        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
-        # for epoch in tqdm(range(1, int(n_epoch)+1), ncols=100):
-            for batch_idx, (x1,x2, y, idxs) in enumerate(loader):
-                x1,x2, y = x1.to(self.device),x2.to(self.device), y.to(self.device)
+        loader_tr = DataLoader(self.handler(X_labeled, Y_labeled,X_unlabeled, Y_unlabeled,
+											transform = self.params['transform_train']), shuffle= True, **self.params['loader_tr_args'])
+        for epoch in tqdm(range(1, int(n_epoch)+1), ncols=100):
+        # for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
+            for batch_idx, (idxs,x_labeled, y_labeled,x_unlabeled1,x_unlabeled2,_ ) in enumerate(loader_tr):
+                x_labeled, y_labeled,x_unlabeled1,x_unlabeled2 = x_labeled.to(self.device),y_labeled.to(self.device), x_unlabeled1.to(self.device),x_unlabeled2.to(self.device)
                 optimizer.zero_grad()
-                out, query = self.clf_query(x1)
+                out, _ = self.clf_query(x_labeled)                
+                ce_loss = F.cross_entropy(out, y_labeled) # compute supervise loss
+
+                _, query = self.clf_query(x_unlabeled1)
                 query=F.normalize(query,dim=1)  # normalize embedding
                 with torch.no_grad():  # no gradient to keys
                     self._momentum_update_key_encoder()  # update the key encoder
-                    _, key = self.clf_key(x2)
+                    _, key = self.clf_key(x_unlabeled2)
                     key=F.normalize(key,dim=1)
-                contrast_loss=self._compute_unlabel_contrastive_loss(query,key)
-                # contrast_criterion=NTXentLoss(device=self.device,batch_size=x1.shape[0],temperature=0.1,use_cosine_similarity=False)
-                # contrast_loss=contrast_criterion(query,key)
-                ce_loss = F.cross_entropy(out, y)
+                contrast_loss=self._compute_unlabel_contrastive_loss(query,key) # compute contrastive loss
+
                 total_loss=ce_loss + self.params['contrast_weight']*contrast_loss
                 # ce_loss.backward()
                 total_loss.backward()
@@ -66,14 +68,14 @@ class ContrastNet:
                 # update when queue size is divisible by batch size
                 if key.shape[0]==self.params['loader_tr_args']['batch_size']: 
                     self._dequeue_and_enqueue(key)
-        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
-            for batch_idx, (x,_, y, idxs) in enumerate(loader):
-                x, y = x.to(self.device), y.to(self.device)
-                optimizer.zero_grad()
-                out, e1 = self.clf_query(x)
-                ce_loss = F.cross_entropy(out, y)
-                ce_loss.backward()
-                optimizer.step()
+        # for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
+        #     for batch_idx, (idxs,x_labeled, y_labeled,_,_,_ ) in enumerate(loader_tr):
+        #         x_labeled, y_labeled = x_labeled.to(self.device),y_labeled.to(self.device)
+        #         optimizer.zero_grad()
+        #         out, e1 = self.clf_query(x_labeled)
+        #         ce_loss = F.cross_entropy(out, y_labeled)
+        #         ce_loss.backward()
+        #         optimizer.step()
     def predict(self, data):
         self.clf_query.eval()
         preds = torch.zeros(len(data), dtype=data.Y.dtype)
@@ -103,18 +105,7 @@ class ContrastNet:
         """
         for param_q, param_k in zip(self.clf_query.parameters(), self.clf_key.parameters()):
             param_k.data = param_k.data * self.params['moco_momentum'] + param_q.data * (1.0 - self.params['moco_momentum'])
-    # def _compute_positive_contrastive_loss(self,keys,appeared_categories):
-    #     """ Calculate contrastive loss enfoces the embeddings of same class
-    #         to be close and different class far away.
-    #     """
-    #     contrast_loss=0
-    #     for cls_ind in appeared_categories:
-    #         query=keys[list(appeared_categories).index(cls_ind)] # (1,D)
-    #         positive_keys= self.queue[cls_ind].clone().detach() # (M,D)
-    #         all_ids=[i for i in range (2)] # all classes
-    #         neg_ids=all_ids.copy().remove(cls_ind)
-    #         negative_keys=self.queue[neg_ids] # 
-    #     return 
+
     def _compute_unlabel_contrastive_loss(self,query,positive_key):
         """ Calculates the unlabel contrastive loss for self-supervised learning.
         Args:

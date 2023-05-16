@@ -11,7 +11,7 @@ import copy
 def get_args():
 	parser = argparse.ArgumentParser(description='Extended Deep Active Learning Toolkit')
 	#basic arguments
-	parser.add_argument('--ALstrategy', '-a', default='EntropySamplingDropout', type=str, help='name of active learning strategies')
+	parser.add_argument('--ALstrategy', '-a', default='OneBit', type=str, help='name of active learning strategies')
 	parser.add_argument('--quota', '-q', default=1000, type=int, help='quota of active learning')
 	parser.add_argument('--batch', '-b', default=128, type=int, help='batch size in one active learning iteration')
 	parser.add_argument('--dataset_name', '-d', default='CIFAR10', type=str, help='dataset name')

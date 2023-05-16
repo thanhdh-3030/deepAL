@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import warnings
 import torch
-from utils import get_dataset, get_net, get_net_lpl, get_net_waal, get_strategy,get_contrast_net
+from utils import get_dataset, get_net, get_net_lpl, get_net_waal, get_strategy,get_contrast_net,get_net_onebit
 from pprint import pprint
 
 torch.set_printoptions(profile='full')
@@ -44,7 +44,7 @@ device = torch.device("cuda" if use_cuda else "cpu")
 #recording
 sys.stdout = Logger(os.path.abspath('') + '/logfile/' + DATA_NAME+ '_'  + STRATEGY_NAME + '_' +'contrastive_'+str(args_input.use_contrast)+'_'+str(NUM_QUERY) + '_' + str(NUM_INIT_LB) +  '_' + str(args_input.quota) + '_normal_log.txt')
 warnings.filterwarnings('ignore')
-experiment_name=STRATEGY_NAME+'_' +'contrastive'+'_moco_mb_momentum2'if args_input.use_contrast else STRATEGY_NAME
+experiment_name=STRATEGY_NAME+'_' +'contrastive'+'_moco_mb_momentum2'if args_input.use_contrast else STRATEGY_NAME +'200_epochs'
 
 # start experiment
 
@@ -73,6 +73,8 @@ while (iteration > 0):
 			net = get_net_lpl(args_input.dataset_name, args_task, device)		# load network
 		elif args_input.ALstrategy == 'WAAL':
 			net = get_net_waal(args_input.dataset_name, args_task, device)		# load network
+		elif args_input.ALstrategy =='OneBit':
+			net =get_net_onebit(args_input.dataset_name, args_task, device)
 		else:
 			net = get_net(args_input.dataset_name, args_task, device)			# load network
 	
@@ -97,7 +99,8 @@ while (iteration > 0):
 	print(type(strategy).__name__)
 	
 	# round 0 accuracy
-	if args_input.ALstrategy == 'WAAL':
+	# if args_input.ALstrategy == 'WAAL':
+	if args_input.ALstrategy == 'WAAL' or args_input.ALstrategy == 'OneBit':
 		strategy.train(model_name = args_input.ALstrategy)
 	else:
 		strategy.train()
@@ -124,7 +127,7 @@ while (iteration > 0):
 		#train
 		if 'CEALSampling' in args_input.ALstrategy:
 			strategy.train(new_data)
-		elif args_input.ALstrategy == 'WAAL':
+		elif args_input.ALstrategy == 'WAAL'or args_input.ALstrategy == 'OneBit':
 			strategy.train(model_name = args_input.ALstrategy)
 		else:
 			strategy.train()
