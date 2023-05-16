@@ -74,7 +74,7 @@ args_pool = {'MNIST':
                  'memory_size':256,
                  'embedding_dim':512,
                  'temperature':0.1,
-                 'contrast_weight':0.1,
+                 'contrast_weight':0.2,
                  'moco_momentum':0.999,
 				 'pretrained': True,
 				 'optimizer':'SGD',
