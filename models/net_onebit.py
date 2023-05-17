@@ -47,7 +47,7 @@ class OnebitNet:
         loader_tr = DataLoader(self.handler(X_labeled, Y_labeled,X_unlabeled, Y_unlabeled,
 											transform = self.params['transform_train']), shuffle= True, **self.params['loader_tr_args'])
         # for epoch in tqdm(range(1, int(n_epoch)+1), ncols=100):
-        for epoch in tqdm(range(1, int(n_epoch/100)+1), ncols=100):
+        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (idxs,x_labeled,_, y_labeled,x_unlabeled1,x_unlabeled2,_ ) in enumerate(loader_tr):
                 x_labeled, y_labeled,x_unlabeled1,x_unlabeled2 = x_labeled.to(self.device),y_labeled.to(self.device), x_unlabeled1.to(self.device),x_unlabeled2.to(self.device)
                 optimizer.zero_grad()
@@ -70,8 +70,8 @@ class OnebitNet:
                 # update memory bank
                 # update when queue size is divisible by batch size
                 if key.shape[0]==self.params['loader_tr_args']['batch_size']: 
-                    self._dequeue_and_enqueue(key,y_labeled)
-        for epoch in tqdm(range(1, int(n_epoch/100)+1), ncols=100):
+                    self._dequeue_and_enqueue_unlabel_queue(key)
+        for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
             for batch_idx, (idxs,x_labeled1,x_labeled2, y_labeled,_,_,_ ) in enumerate(loader_tr):
                 x_labeled1,x_labeled2, y_labeled = x_labeled1.to(self.device),x_labeled2.to(self.device),y_labeled.to(self.device)
                 optimizer.zero_grad()
@@ -92,7 +92,8 @@ class OnebitNet:
                 # update memory bank
                 # update when queue size is divisible by batch size
                 if key.shape[0]==self.params['loader_tr_args']['batch_size']:
-                    self._dequeue_and_enqueue(key,y_labeled) 
+                    self._dequeue_and_enqueue_unlabel_queue(key)
+                    self._dequeue_and_enqueue_label_queue(key,y_labeled)  
     def _compute_yes_query_loss(self,out,feature,label,feature_aug,labels_onehot,onebit_mask):
         out=out[onebit_mask]
         feature=feature[onebit_mask]
@@ -101,13 +102,15 @@ class OnebitNet:
         label=label[onebit_mask]
         ce_loss = F.cross_entropy(out, label) # Cross Entropy loss
         postive_ctr_loss = torch.tensor(0.0)
+        valid_class=0
         for i in range(self.params['num_class']):
             cls_mask=labels_onehot[:,i]
-            query=feature[cls_mask]
+            query=feature[cls_mask.bool()]
             if(len(query)==0): continue
-            aug_positive_key=feature_aug[cls_mask]
+            valid_class=valid_class+1
+            aug_positive_key=feature_aug[cls_mask.bool()]
             postive_ctr_loss = postive_ctr_loss +self._compute_positive_contrastive_loss(query,i,aug_positive_key)
-        return ce_loss,postive_ctr_loss
+        return ce_loss,postive_ctr_loss/valid_class
     def _compute_no_query_loss(self,pred,feature,label,feature_aug,labels_onehot,onebit_mask):
         pred=pred[~onebit_mask]
         feature=feature[~onebit_mask]
@@ -116,13 +119,15 @@ class OnebitNet:
         label=label[onebit_mask]
         neg_loss = F.cross_entropy(pred, label) # Cross Entropy loss
         neg_ctr_loss = torch.tensor(0.0)
+        valid_class=0
         for i in range(self.params['num_class']):
             cls_mask=labels_onehot[:,i]
-            query=feature[cls_mask]
+            query=feature[cls_mask.bool()]
             if(len(query)==0): continue
+            valid_class=valid_class+1
             aug_positive_key=feature_aug[cls_mask]
             neg_ctr_loss = neg_ctr_loss +self._compute_negative_contrastive_loss(query,i,aug_positive_key)
-        return neg_loss,neg_ctr_loss
+        return neg_loss,neg_ctr_loss/valid_class
     def _compute_unlabel_contrastive_loss(self,query,positive_key):
         # get negative keys form unlabel memory bank
         negative_keys=self.unlabel_queue.clone().detach()
@@ -194,7 +199,7 @@ class OnebitNet:
                 preds[idxs] = pred.cpu()
         return preds
     @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys,labels):
+    def _dequeue_and_enqueue_unlabel_queue(self, keys):
         # gather keys before updating queue
         batch_size = keys.shape[0]
         ptr = int(self.unlabel_queue_ptr)
@@ -204,6 +209,8 @@ class OnebitNet:
         self.unlabel_queue[:, ptr : ptr + batch_size] = keys.T
         ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
         self.unlabel_queue_ptr[0] = ptr
+    @torch.no_grad()
+    def _dequeue_and_enqueue_label_queue(self, keys,labels):
         # update label_queue
         onehot_labels=F.one_hot(labels,num_classes=self.params['num_class'])
         for i in range(self.params['num_class']):
