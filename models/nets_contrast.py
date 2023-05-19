@@ -64,8 +64,8 @@ class ContrastNet:
 
                 # update memory bank
                 # update when queue size is divisible by batch size
-                if key.shape[0]==self.params['loader_tr_args']['batch_size']: 
-                    self._dequeue_and_enqueue(key)
+                # if key.shape[0]==self.params['loader_tr_args']['batch_size']: 
+                self._dequeue_and_enqueue(key)
         # for epoch in tqdm(range(1, int(n_epoch/2)+1), ncols=100):
         #     for batch_idx, (x,_, y, idxs) in enumerate(loader):
         #         x, y = x.to(self.device), y.to(self.device)
@@ -91,9 +91,19 @@ class ContrastNet:
         # gather keys before updating queue
         batch_size = keys.shape[0]
         ptr = int(self.queue_ptr)
-        assert self.params['memory_size'] % batch_size == 0  # for simplicity
+        # assert self.params['memory_size'] % batch_size == 0  # for simplicity
         # replace the keys at ptr (dequeue and enqueue)
-        self.queue[:, ptr : ptr + batch_size] = keys.T
+        if (ptr+batch_size) <= self.params['memory_size']:
+            self.queue[:, ptr : ptr + batch_size] = keys.T
+        else:
+            # update queue
+            inx=self.params['memory_size']-ptr
+            head_keys=keys[:inx]
+            tail_keys=keys[inx:]
+            self.queue[:, ptr :]=head_keys.T
+            self.queue[:,:len(tail_keys)]=tail_keys.T
+            
+        # update queue pointer
         ptr = (ptr + batch_size) % self.params['memory_size']  # move pointer
         self.queue_ptr[0] = ptr
     @torch.no_grad()
